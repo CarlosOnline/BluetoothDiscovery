@@ -62,7 +62,7 @@ namespace BlueToothDevices
             {
                 if (key == null)
                 {
-                    Console.WriteLine("GetLocalServices: missing HKLM {0}", BluetoothRegKey7);
+                    Console.WriteLine("GetDeviceNamesForWindows7: missing HKLM {0}", BluetoothRegKey7);
                     return;
                 }
 
@@ -84,17 +84,25 @@ namespace BlueToothDevices
                                 var deviceId = GetDeviceToken(GetValue(k2, "AssocBdAddr"));
                                 if (string.IsNullOrEmpty(deviceId))
                                 {
-                                    Console.WriteLine("GetLocalServices: Missing required deviceId");
+                                    Console.WriteLine("GetDeviceNamesForWindows7: Missing required deviceId");
                                     continue;
                                 }
 
-                                var deviceInfo = new BluetoothDevice
+                                BluetoothDevice deviceInfo;
+                                if (!_devices.TryGetValue(deviceId, out deviceInfo))
                                 {
-                                    Name = friendlyName,
-                                    DeviceId = deviceId,
-                                };
-                                Verbose("GetLocalServices: Add {0}", deviceInfo);
-                                _devices.Add(deviceId, deviceInfo);
+                                    deviceInfo = new BluetoothDevice
+                                    {
+                                        Name = friendlyName,
+                                        DeviceId = deviceId,
+                                    };
+                                    Verbose("GetDeviceNamesForWindows7: Add {0}", deviceInfo);
+                                    _devices.Add(deviceId, deviceInfo);
+                                }
+                                else if (deviceInfo.Name != friendlyName || deviceInfo.DeviceId != deviceId)
+                                {
+                                    Console.WriteLine("DeviceId maps to different FriendlyName/Id.  Old: {0} {1} - New: {2} {3}", deviceInfo.DeviceId, deviceInfo.Name, deviceId, friendlyName);
+                                }
                             }
                         }
                     }
@@ -133,7 +141,7 @@ namespace BlueToothDevices
                                     continue;
 
                                 BluetoothDevice deviceInfo;
-                                var deviceId = GetDeviceName2(pnpName);
+                                var deviceId = GetBluetoothDeviceId(pnpName);
                                 if (string.IsNullOrEmpty(deviceId))
                                     continue;
 
@@ -184,7 +192,7 @@ namespace BlueToothDevices
                                 if (!isLocalMfg)
                                     continue;
 
-                                var deviceId = GetDeviceName(pnpName);
+                                var deviceId = GetDeviceId(pnpName);
                                 if (deviceId == NullDeviceId)
                                     continue;
 
@@ -240,7 +248,7 @@ namespace BlueToothDevices
             return null;
         }
 
-        private static string GetDeviceName(string value)
+        private static string GetDeviceId(string value)
         {
             //Verbose("GetDeviceName: {0}", value);
 
@@ -263,23 +271,27 @@ namespace BlueToothDevices
             return id;
         }
 
-        private static string GetDeviceName2(string value)
+        private static string GetBluetoothDeviceId(string value)
         {
-            //Verbose("GetDevicename2: {0}", value);
+            //Verbose("GetBluetoothDeviceId: {0}", value);
+
+            //"7&13e7003a&0&BluetoothDevice_646E6CC16891"
+            if (-1 == value.ToLower().IndexOf("bluetoothdevice_"))
+                return GetDeviceId(value);
 
             var parts = value.Split('_');
             if (parts.Length <= 1)
             {
-                Console.WriteLine("GetDeviceName2: name parse error on {0}", value);
+                Console.WriteLine("GetBluetoothDeviceId: name parse error on {0}", value);
                 return "";
             }
             var deviceId = parts[1];
             if (string.IsNullOrEmpty(deviceId))
             {
-                Console.WriteLine("GetDeviceName2: parse error on {0}", value);
+                Console.WriteLine("GetBluetoothDeviceId: parse error on {0}", value);
                 return "";
             }
-            Verbose("GetDeviceName2: returns {0}", deviceId);
+            Verbose("GetBluetoothDeviceId: returns {0}", deviceId);
             return deviceId;
         }
 
